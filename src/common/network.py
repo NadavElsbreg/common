@@ -218,6 +218,7 @@ def free_port_scanner(host: str, start_port: int, end_port: int, timeout: float 
             print(f"Checked port {port} {GREEN} Free{RESET}" if resalt else f"Checked port {port} {RED} Used{RESET}")
     return open_ports
 
+
 def scan_ports_list(host: str, ports: list[int], timeout: float = 1.0) -> dict[int, bool]:
     """
     Scan a list of TCP ports on the given host and return a dictionary
