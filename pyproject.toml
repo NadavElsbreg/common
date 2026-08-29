@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "common"
-version = "1.2.2"
+version = "1.2.3"
 description = "Shared utilities for casual scripting"
 authors = [{ name = "Nadav Elsberg", email = "Nadav.Elsberg@protonmail.com" }]
 license = { file = "LICENSE" }

@@ -39,6 +39,14 @@ def ping_host(host: str, count: int = 4, timeout: int = 2) -> tuple[bool, str]:
 
         completed = subprocess.run(args, capture_output=True, text=True, timeout=max(10, count * timeout + 5))
         output = (completed.stdout or "") + ("\n" + completed.stderr if completed.stderr else "")
+        normalized = output.lower()
+
+        # Some Windows ping outputs can still report a successful exit code while
+        # the only replies are from a gateway/router saying the destination host is
+        # unreachable. In that case the target is not actually reachable.
+        if "destination host unreachable" in normalized:
+            return False, output.strip()
+
         return (completed.returncode == 0, output.strip())
     except subprocess.TimeoutExpired: # type: ignore
         return (False, "ping command timed out")
@@ -353,6 +361,7 @@ def is_port_valid(port: int) -> bool:
 
 
 def get_host_name(ip: str) -> str:
+
     """
     Get the hostname for a given IP address.
 
@@ -364,3 +373,39 @@ def get_host_name(ip: str) -> str:
         return socket.gethostbyaddr(ip)[0]
     except Exception:
         return ip
+
+
+def ntfy(server: str = "ntfy.sh", topic: str = "Mistake", data="Someone did not call this function currectly", user: str = None, password: str = None, title: str = None, tags: list[str] = None, priority: int = 3, timeout: int = 5) -> bool:  # pyright: ignore[reportArgumentType]
+    """
+    Send a notification using the ntfy service.
+
+    server: ntfy server URL (default "https://ntfy.sh")
+    topic: topic to publish to (string)
+    data: message content (string)
+    user: username for authentication (optional)
+    password: password for authentication (optional)
+    title: notification title (optional)
+    tags: list of tags for the notification (optional)
+    priority: notification priority (1-5, default 3)
+    timeout: request timeout in seconds (default 5)
+
+    returns: True if the notification was sent successfully, otherwise False
+    """
+    try:
+        import requests
+
+        url = f"http://{server}:2586/{topic}"
+        headers = {}
+        if title:
+            headers["Title"] = title
+        if tags:
+            headers["Tags"] = ",".join(tags)
+        headers["Priority"] = str(priority)
+
+        auth = (user, password) if user and password else None
+
+        response = requests.post(url, data=data.encode("utf-8"), headers=headers, auth=auth, timeout=timeout)
+        return response.status_code == 200
+    except Exception:
+        return False
+
