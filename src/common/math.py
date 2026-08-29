@@ -81,4 +81,3 @@ def audit_ID(IDNumber: str) -> bool:
         return False
     audit_digit = control_digit(IDNumber)
     return audit_digit == int(IDNumber[-1])
-

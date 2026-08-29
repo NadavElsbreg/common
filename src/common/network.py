@@ -4,7 +4,7 @@ __all__ = [
     name for name in globals()
     if not name.startswith("_")
     and callable(globals()[name])
-]
+] # type: ignore
 
 
 def ping_host(host: str, count: int = 4, timeout: int = 2) -> tuple[bool, str]:
@@ -40,7 +40,7 @@ def ping_host(host: str, count: int = 4, timeout: int = 2) -> tuple[bool, str]:
         completed = subprocess.run(args, capture_output=True, text=True, timeout=max(10, count * timeout + 5))
         output = (completed.stdout or "") + ("\n" + completed.stderr if completed.stderr else "")
         return (completed.returncode == 0, output.strip())
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired: # type: ignore
         return (False, "ping command timed out")
     except Exception as e:
         return (False, str(e))
@@ -71,6 +71,7 @@ def am_I_online(timeout: int = 5) -> bool:
     for server in dns_servers:
         if ping(server, timeout=timeout):
             return True
+    return False
 
     
 def get_local_ip() -> str:
@@ -151,7 +152,7 @@ def get_mac_address() -> str:
         return "00:00:00:00:00:00"
 
 
-def _tuple_is_port_open(host: str, port: int, timeout: float = 1.0) -> tuple[bool,str]:
+def _tuple_is_port_open(host: str, port: int, timeout: int = 1) -> tuple[bool,str]:
     """
     inputs: host (str), port (int), timeout (float)
     returns if the port spesified on the host is open: tuple (is_open: bool, message: str)
@@ -173,7 +174,7 @@ def _tuple_is_port_open(host: str, port: int, timeout: float = 1.0) -> tuple[boo
     except Exception:
         return False, f"{port} is closed"
 
-def is_port_open(host: str, port: int, timeout: float = 1.0, returntuple: bool = False) -> bool | tuple[bool,str]:
+def is_port_open(host: str, port: int, timeout: int = 1, returntuple: bool = False) -> bool | tuple[bool,str]:
     """
     Check whether a TCP port on the given host is open.
 
@@ -191,6 +192,37 @@ def is_port_open(host: str, port: int, timeout: float = 1.0, returntuple: bool =
         return _tuple_is_port_open(host, port, timeout=timeout)
     return _tuple_is_port_open(host, port, timeout=timeout)[0]
 
+
+def is_port_open_udp(host: str, port: int, timeout: float = 1.0) -> bool:
+       # Create an IPv4 UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    
+    try:
+        # A payload is often required. Some services ignore completely empty packets.
+        payload = b'\x00' 
+        sock.sendto(payload, (host, port))
+        
+        # Try to receive a response
+        data, server = sock.recvfrom(1024)
+        print(f"[+] Port {port} is OPEN (Received response).")
+        return True
+        
+    except socket.timeout:
+        # Most open UDP ports will timeout because they don't respond to arbitrary payloads
+        print(f"[?] Port {port} is OPEN or FILTERED (No response received).")
+        return True
+        
+    except socket.error as e:
+        # If the OS catches an ICMP Unreachable packet, it raises a ConnectionRefusedError
+        if e.errno == socket.errno.ECONNREFUSED: # type: ignore
+            print(f"[-] Port {port} is CLOSED (Connection refused).")
+        else:
+            print(f"[-] Error checking port {port}: {e}")
+        return False
+        
+    finally:
+        sock.close()
 
 def ping_list(hosts: list[str], timeout: int = 2, count: int = 1, show_progress: bool = False) -> dict[str, bool]:
     """
@@ -211,7 +243,7 @@ def ping_list(hosts: list[str], timeout: int = 2, count: int = 1, show_progress:
     return results   
 
 
-def free_port_scanner(host: str, start_port: int, end_port: int, timeout: float = 1.0, show_progress: bool = False) -> list[int]:
+def free_port_scanner(host: str, start_port: int, end_port: int, timeout: int = 1, show_progress: bool = False) -> list[int]:
     """
     Scan a range of TCP ports on the given host and return a list of open ports.
 
@@ -235,7 +267,7 @@ def free_port_scanner(host: str, start_port: int, end_port: int, timeout: float 
     return open_ports
 
 
-def scan_ports_list(host: str, ports: list[int], timeout: float = 1.0) -> dict[int, bool]:
+def scan_ports_list(host: str, ports: list[int], timeout: int = 1) -> dict[int, bool]:
     """
     Scan a list of TCP ports on the given host and return a dictionary
     mapping each port to its open status (True/False).
@@ -318,3 +350,17 @@ def is_port_valid(port: int) -> bool:
         return 0 <= int(port) <= 65535
     except Exception:
         return False
+
+
+def get_host_name(ip: str) -> str:
+    """
+    Get the hostname for a given IP address.
+
+    ip: IP address as a string
+
+    returns: hostname as a string, or the original IP if resolution fails
+    """
+    try:
+        return socket.gethostbyaddr(ip)[0]
+    except Exception:
+        return ip
